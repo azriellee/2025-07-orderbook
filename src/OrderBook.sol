@@ -152,6 +152,7 @@ contract OrderBook is Ownable {
         if (_newPriceInUSDC == 0) revert InvalidPrice();
         if (_newDeadlineDuration == 0 || _newDeadlineDuration > MAX_DEADLINE_DURATION) revert InvalidDeadline();
 
+        // audit-info: this would essentially allow me to extend the deadline of the order indefinitely, intended behaviour?
         uint256 newDeadlineTimestamp = block.timestamp + _newDeadlineDuration;
         IERC20 token = IERC20(order.tokenToSell);
 
@@ -275,6 +276,7 @@ contract OrderBook is Ownable {
         emit TokenAllowed(_token, _isAllowed);
     }
 
+    // @audit-info: this function would allow the owner to drain the additional erc20 tokens that have been allowed, does it matter?
     function emergencyWithdrawERC20(address _tokenAddress, uint256 _amount, address _to) external onlyOwner {
         if (
             _tokenAddress == address(iWETH) || _tokenAddress == address(iWBTC) || _tokenAddress == address(iWSOL)

